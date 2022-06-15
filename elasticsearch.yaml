@@ -1,0 +1,77 @@
+---
+- hosts: elasticsearch
+  tasks:
+    - name: Import Elasticsearch GPG key
+      ansible.builtin.apt_key:
+        keyserver: pgp.mit.edu
+        id: d27d666cd88e42b4
+    - name: Add Elasticsearch Repository
+      ansible.builtin.apt_repository:
+        repo: deb https://artifacts.elastic.co/packages/8.x/apt stable main
+    - name: Install Elasticsearch and Kibana
+      ansible.builtin.apt:
+        name: elasticsearch,kibana
+        state: present
+    - name: Creat Elasticsearch configuration
+      ansible.builtin.template:
+        src: elasticsearch.yml
+        dest: /etc/elasticsearch/elasticsearch.yml
+        mode: 0660
+        owner: root
+        group: elasticsearch
+      notify:
+        - Restart Elasticsearch
+    - name: Enable and start Elasticsearch service
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: started
+        enabled: true
+    - name: Set password for Elasticsearch default user
+      ansible.builtin.expect:
+        command: /usr/share/elasticsearch/bin/elasticsearch-reset-password -i -b -s -u elastic
+        responses:
+          password: "{{ elasticsearch_default_user_password }}"
+    - name: Generate Ansible Playbook run identifier
+      ansible.builtin.set_fact:
+        ansible_playbook_run_id: "ansible_playbook_run_{{ lookup('community.general.random_string', upper=false, special=false) }}"
+    - name: Create Kibana service account token
+      ansible.builtin.shell:
+        cmd: /usr/share/elasticsearch/bin/elasticsearch-service-tokens create elastic/kibana {{ ansible_playbook_run_id }}
+      register: generated_service_token
+    - name: Correct the permissions on the service tokens file
+      ansible.builtin.file:
+        path: /etc/elasticsearch/service_tokens
+        owner: root
+        group: elasticsearch
+        mode: 0660
+    - name: Copy Elasticsearch CA for Kibana
+      ansible.builtin.copy:
+        remote_src: yes
+        src: /etc/elasticsearch/certs/http_ca.crt
+        dest: /etc/kibana/elasticsearch_ca.crt
+        mode: 0444
+        owner: root
+        group: root
+    - name: Copy Kibana configuration
+      ansible.builtin.template:
+        src: kibana.yml
+        dest: /etc/kibana/kibana.yml
+        mode: 0660
+        owner: root
+        group: kibana
+      notify:
+        - Restart Kibana
+    - name: Enable Kibana service
+      ansible.builtin.systemd:
+        name: kibana
+        state: started
+        enabled: true
+  handlers:
+    - name: Restart Elasticsearch
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: restarted
+    - name: Restart Kibana
+      ansible.builtin.systemd:
+        name: kibana
+        state: restarted

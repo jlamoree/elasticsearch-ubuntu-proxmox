@@ -1,0 +1,11 @@
+---
+all:
+  hosts:
+    elasticsearch01:
+      ansible_host: elasticsearch01.internal.newbury-park.lamoree.net
+  children:
+    elasticsearch:
+      hosts:
+        elasticsearch01:
+      vars:
+        ansible_become: true

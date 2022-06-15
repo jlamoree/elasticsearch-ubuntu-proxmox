@@ -1,0 +1,4 @@
+---
+elasticsearch_default_user_password: "{{ vault_elasticsearch_default_user_password }}"
+elasticsearch_primary_hostname: elasticsearch01.internal.newbury-park.lamoree.net
+kibana_web_hostname: elasticsearch01.internal.newbury-park.lamoree.net
